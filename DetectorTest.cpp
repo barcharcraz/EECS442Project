@@ -22,9 +22,16 @@ int main(int argc, char** argv) {
   auto hog = cuda::HOG::create();
   Mat detector = hog->getDefaultPeopleDetector();
   hog->setSVMDetector(detector);
+  hog->setNumLevels(9);
+  hog->setHitThreshold(0);
+  hog->setScaleFactor(1.02);
+  hog->setGroupThreshold(2);
   
   namedWindow("EECS442 Project", CV_WINDOW_AUTOSIZE);
   Mat img;
+  Mat img_aux;
+  Mat orig;
+  cuda::GpuMat gpu_img;
   while (true) {
     cap >> img;
     if (!img.data) {
@@ -32,18 +39,24 @@ int main(int argc, char** argv) {
     }
     vector<Rect> found;
     vector<Rect> found_filtered;
+	orig = img;
+	cvtColor(img, img_aux, COLOR_BGR2GRAY);
+	resize(img_aux, img, Size(1280, 720));
+
+	gpu_img.upload(img);
+
     //hog.detectMultiScale(img, found, 0, Size(8, 8), Size(32, 32), 1.02, 2);
     //hog.detect(img, found, 0, Size(8, 8), Size(32, 32));
-	hog->detectMultiScale(img, found);
+	hog->detectMultiScale(gpu_img, found);
     fprintf(stderr, "Size: %d", found.size());
     for (int i = 0; i < found.size(); ++i) {
       auto r = found[i];
-      rectangle(img, r.tl(), r.br(), cv::Scalar(0, 255, 0), 2);
+      rectangle(orig, r.tl() * 1.5, r.br() * 1.5, cv::Scalar(0, 255, 0), 2);
     }
     if (found.size()) {
-      output << img;
+      output << orig;
     }
-    imshow("EECS442 Project", img);
+    imshow("EECS442 Project", orig);
     if (waitKey(20) >= 0) {
       break;
     }
