@@ -4,3 +4,5 @@ find_package(OpenCV REQUIRED CONFIG)
 add_executable(DetectorTest DetectorTest.cpp)
 target_link_libraries(DetectorTest ${OpenCV_LIBS})
 target_include_directories(DetectorTest PRIVATE ${OpenCV_INCLUDE_DIRS})
+
+set_property(TARGET DetectorTest PROPERTY CXX_STANDARD 11)

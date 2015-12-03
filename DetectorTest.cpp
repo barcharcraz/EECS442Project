@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
 	using std::vector;
 	VideoCapture cap("VIRAT_S_000001.mp4");
 	if (!cap.isOpened()) {
+    fprintf(stderr, "Could not open video\n");
 		std::exit(EXIT_FAILURE);
 	}
 	VideoWriter output;
