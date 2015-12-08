@@ -12,8 +12,9 @@ def process(video_path):
 	# must provide a valid path to a video
 	if not path.isfile(video_path):
 		raise RuntimeError("Incorrect path to video file")
-	process_optical_LK(video_path)
+	process_optical_flow(video_path)
 	# process_demo(video_path)
+	# process_MOG(video_path)
 
 
 def process_demo(video_path):
@@ -97,13 +98,14 @@ def process_MOG(video_path):
 			print('No frame could be grabbed. Exiting video processing...')
 			break
 
-		# frame = imutils.resize(frame, width=800)
-		# gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-		# gray = cv2.GaussianBlur(frame, (21, 21), 0)
-		gray = frame
+		frame = imutils.resize(frame, width=600)
+		# gray = frame
+		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+		gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
 		fgmask = fgbg.apply(gray)
-		cv2.imshow('frame',fgmask)
+		cv2.imshow('mask',fgmask)
+		cv2.imshow('frame',frame)
 		k = cv2.waitKey(30) & 0xff
 		if k == ord("q"):
 			break
