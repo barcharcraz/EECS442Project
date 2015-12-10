@@ -305,11 +305,11 @@ def create_and_parse_args():
     """Create the args for the program"""
     ap = argparse.ArgumentParser()
     ap.add_argument("video", type=str, help="path to the video file")
-    ap.add_argument("output_dir", type=str, help="path to output directory")
-    ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
+    ap.add_argument("-o", "--out_dir", type=str, help="path to output directory")
+    ap.add_argument("-a", "--min_area", type=int, default=500, help="minimum area size")
     return vars(ap.parse_args())
 
 
 if __name__ == '__main__':
     args = create_and_parse_args()
-    process(args.get('video', None), args.get('output_dir', ""))
+    process(args.get('video', None), args.get('out_dir', ""))
