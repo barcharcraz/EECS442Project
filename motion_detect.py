@@ -8,20 +8,24 @@ import cv2
 from os import path
 
 
-def process(video_path):
+def process(video_path, output_path=""):
     # must provide a valid path to a video
     if not path.isfile(video_path):
         raise RuntimeError("Incorrect path to video file")
-    process_frame_diff(video_path)
+    process_frame_diff(video_path, output_path)
 
 
-def get_video_writer(title, width, height):
-    assert width > 0 and height > 0
-    if title is None:
-        title = "OUTPUT_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + '.avi'
-        print(title)
+def get_video_name(video_path):
+    return str.rsplit(path.basename(path.normpath(video_path)), '.', 1)[0]
+
+
+
+def get_video_writer(cap, video_path, output_path=""):
+    output_path = path.join(output_path, get_video_name(video_path))
+    output_path += "_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + '.avi'
     fourcc = cv2.cv.CV_FOURCC(*'XVID')
-    return cv2.VideoWriter(title, fourcc, 24, (int(width), int(height)))
+    # 3 and 4 give capture width and height respectively
+    return cv2.VideoWriter(output_path, fourcc, 24, (int(cap.get(3)), int(cap.get(4))))
 
 
 def grab_and_convert_frame(cap):
@@ -34,18 +38,14 @@ def grab_and_convert_frame(cap):
     return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), orig
 
 
-def process_frame_diff(video_path):
+def process_frame_diff(video_path, output_path=""):
     cap = cv2.VideoCapture(video_path)
     (background_model, _) = grab_and_convert_frame(cap)
     # No more frames left to grab or something went wrong
     if background_model is None:
         return
-
-    # number of frames to include for background
-    buffer_size = 10
     dilation_kernel = np.ones((5, 5), np.uint8)
-    # 3 and 4 give capture width and height respectively
-    writer = get_video_writer(None, cap.get(3), cap.get(4))
+    writer = get_video_writer(cap, video_path, output_path)
 
     while True:
         frame, orig = grab_and_convert_frame(cap)
@@ -305,10 +305,11 @@ def create_and_parse_args():
     """Create the args for the program"""
     ap = argparse.ArgumentParser()
     ap.add_argument("video", type=str, help="path to the video file")
+    ap.add_argument("output_dir", type=str, help="path to output directory")
     ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
     return vars(ap.parse_args())
 
 
 if __name__ == '__main__':
     args = create_and_parse_args()
-    process(args.get('video', None))
+    process(args.get('video', None), args.get('output_dir', ""))
