@@ -1,2 +1,8 @@
 build/*
 *.swp
+
+# windows Thumbs.db
+*Thumbs.db
+
+# output videos
+*.avi
