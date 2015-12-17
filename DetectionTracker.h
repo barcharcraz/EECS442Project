@@ -1,6 +1,7 @@
 #ifndef BARTOC_DETECTOR_TRACKING_H
 #define BARTOC_DETECTOR_TRACKING_H
 #include <opencv2/opencv.hpp>
+#include <array>
 template<typename T, int C>
 class CircularBuffer {
   int _start = 0;

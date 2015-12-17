@@ -46,7 +46,11 @@ void DetectionTracker::addDetections(const vector<Rect>& detections) {
     for(auto& elm : detections) {
         addDetection(elm);
     }
+	assert(tracks.size() == updated_tracks.size());
+	assert(tracks.size() == track_times.size());
     for(int i = 0; i < tracks.size(); ++i) {
+		assert(tracks.size() == updated_tracks.size());
+		assert(tracks.size() == track_times.size());
         const double time_limit = 15.0 / eps_mult;
         fprintf(stderr, "%d: %f", i, double(track_times[i]));
         if(double(track_times[i]) > time_limit) {
