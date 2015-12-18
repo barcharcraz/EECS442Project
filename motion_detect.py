@@ -12,10 +12,11 @@ def process(video_path, output_path=None):
     # must provide a valid path to a video
     if not path.isfile(video_path):
         raise RuntimeError("Incorrect path to video file")
-    # process_frame_diff(video_path, output_path)
+    process_frame_diff(video_path, output_path)
     # process_optical_LK(video_path)
     # process_optical_flow(video_path)
-    process_frame_diff_optical(video_path)
+    # process_frame_diff_optical(video_path)
+    # process_MOG(video_path)
 
 
 def get_video_name(video_path):
@@ -156,7 +157,7 @@ def process_demo(video_path):
 
 def process_MOG(video_path):
     cap = cv2.VideoCapture(video_path)
-    fgbg = cv2.BackgroundSubtractorMOG()
+    fgbg = cv2.BackgroundSubtractorMOG(5, 5, 0.01)
 
     while (1):
         grabbed, frame = cap.read()
@@ -261,8 +262,6 @@ def process_frame_diff_optical(video_path):
                      maxLevel=2,
                      criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
-    # Create a mask image for drawing purposes
-    mask = np.zeros_like(background_model)
     # Create some random colors
     color = np.random.randint(0, 255, (100, 3))
 
@@ -283,6 +282,8 @@ def process_frame_diff_optical(video_path):
         nonzeros = cv2.findNonZero(dilation)
 
         frame_changed = frame.copy();
+        # Create a mask image for drawing purposes
+        mask = np.zeros_like(background_model)
         if nonzeros is not None and len(nonzeros) > 0:
             nonzeros = np.float32(nonzeros)
             p1, st, err = cv2.calcOpticalFlowPyrLK(background_model, frame_changed, nonzeros, None, **lk_params)
