@@ -23,7 +23,10 @@ def get_video_name(video_path):
 def get_video_writer(cap, video_path, output_path=""):
     output_path = path.join(output_path, get_video_name(video_path))
     output_path += "_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + '.avi'
-    fourcc = cv2.cv.CV_FOURCC(*'XVID')
+
+    #fourcc = cv2.cv.CV_FOURCC(*'XVID')
+    # Try the mac codec
+    fourcc = cv2.cv.CV_FOURCC(*'DIVX')
     # 3 and 4 give capture width and height respectively
     return cv2.VideoWriter(output_path, fourcc, 24, (int(cap.get(3)), int(cap.get(4))))
 
