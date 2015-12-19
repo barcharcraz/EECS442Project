@@ -8,24 +8,30 @@ import cv2
 from os import path
 
 
-def process(video_path, output_path=""):
+def process(video_path, output_path=None):
     # must provide a valid path to a video
     if not path.isfile(video_path):
         raise RuntimeError("Incorrect path to video file")
     process_frame_diff(video_path, output_path)
+    # process_optical_LK(video_path)
+    # process_optical_flow(video_path)
+    # process_frame_diff_optical(video_path)
+    # process_MOG(video_path)
 
 
 def get_video_name(video_path):
     return str.rsplit(path.basename(path.normpath(video_path)), '.', 1)[0]
 
 
-
-def get_video_writer(cap, video_path, output_path=""):
+def get_video_writer(cap, video_path, output_path=None):
+    if output_path is None:
+        output_path = ""
     output_path = path.join(output_path, get_video_name(video_path))
     output_path += "_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + '.avi'
     fourcc = cv2.cv.CV_FOURCC(*'XVID')
-    # 3 and 4 give capture width and height respectively
-    return cv2.VideoWriter(output_path, fourcc, 24, (int(cap.get(3)), int(cap.get(4))))
+    # See this link for what each index corresponds to:
+    # http://docs.opencv.org/2.4/modules/highgui/doc/reading_and_writing_images_and_video.html#videocapture-get
+    return cv2.VideoWriter(output_path, fourcc, cap.get(5), (int(cap.get(3)), int(cap.get(4))))
 
 
 def grab_and_convert_frame(cap):
@@ -38,13 +44,13 @@ def grab_and_convert_frame(cap):
     return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), orig
 
 
-def process_frame_diff(video_path, output_path=""):
+def process_frame_diff(video_path, output_path=None):
     cap = cv2.VideoCapture(video_path)
     (background_model, _) = grab_and_convert_frame(cap)
     # No more frames left to grab or something went wrong
     if background_model is None:
         return
-    dilation_kernel = np.ones((5, 5), np.uint8)
+    dilation_kernel = np.ones((3, 3), np.uint8)
     writer = get_video_writer(cap, video_path, output_path)
 
     while True:
@@ -62,7 +68,7 @@ def process_frame_diff(video_path, output_path=""):
             writer.write(orig)
 
         # display frames
-        # cv2.imshow("Current frame", frame)
+        cv2.imshow("Current frame", frame)
         # cv2.imshow("Background model", background_model)
         cv2.imshow("Diff", dilation)
 
@@ -73,6 +79,9 @@ def process_frame_diff(video_path, output_path=""):
         k = cv2.waitKey(1) & 0xff
         if k == ord("q"):
             break
+        elif k == ord('p'):
+            cv2.imwrite("test_frame_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + ".png", frame)
+            cv2.imwrite("test_thresh_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + ".png", dilation)
 
     writer.release()
     cap.release()
@@ -148,7 +157,7 @@ def process_demo(video_path):
 
 def process_MOG(video_path):
     cap = cv2.VideoCapture(video_path)
-    fgbg = cv2.BackgroundSubtractorMOG()
+    fgbg = cv2.BackgroundSubtractorMOG(5, 5, 0.01)
 
     while (1):
         grabbed, frame = cap.read()
@@ -213,14 +222,14 @@ def process_optical_flow(video_path):
     hsv = np.zeros_like(frame1)
     hsv[..., 1] = 255
 
-    while (1):
+    while True:
         ret, frame2 = cap.read()
         frame2 = imutils.resize(frame2, width=800)
-        next = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
-        next = cv2.GaussianBlur(next, (21, 21), 0)
+        next_f = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
+        next_f = cv2.GaussianBlur(next_f, (21, 21), 0)
 
         # flow = cv2.calcOpticalFlowFarneback(prvs, next, 0.5, 1, 3, 15, 3, 5, 1)
-        flow = cv2.calcOpticalFlowFarneback(prvs, next, 0.5, 3, 15, 3, 5, 1.2, 0)
+        flow = cv2.calcOpticalFlowFarneback(prvs, next_f, 0.5, 3, 15, 3, 5, 1.2, 0)
 
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
         hsv[..., 0] = ang * 180 / np.pi / 2
@@ -231,10 +240,83 @@ def process_optical_flow(video_path):
         k = cv2.waitKey(30) & 0xff
         if k == ord('q'):
             break
-        elif k == ord('s'):
-            cv2.imwrite('opticalfb.png', frame2)
-            cv2.imwrite('opticalhsv.png', rgb)
-        prvs = next
+        # elif k == ord('s'):
+        #     cv2.imwrite('opticalfb.png', frame2)
+        #     cv2.imwrite('opticalhsv.png', rgb)
+        prvs = next_f
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+def process_frame_diff_optical(video_path):
+    cap = cv2.VideoCapture(video_path)
+    (background_model, _) = grab_and_convert_frame(cap)
+    # No more frames left to grab or something went wrong
+    if background_model is None:
+        return
+
+    dilation_kernel = np.ones((3, 3), np.uint8)
+    # Parameters for lucas kanade optical flow
+    lk_params = dict(winSize=(15, 15),
+                     maxLevel=2,
+                     criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+    # Create some random colors
+    color = np.random.randint(0, 255, (100, 3))
+
+    feature_params = dict(maxCorners=100,
+                          qualityLevel=0.3,
+                          minDistance=7,
+                          blockSize=7)
+
+    while True:
+        frame, orig = grab_and_convert_frame(cap)
+        if frame is None:
+            break
+
+        # calculate the difference
+        delta = cv2.absdiff(frame, background_model)
+        thresh = cv2.threshold(delta, 50, 255, cv2.THRESH_BINARY)[1]
+        dilation = cv2.dilate(thresh, dilation_kernel, iterations=1)
+        nonzeros = cv2.findNonZero(dilation)
+
+        frame_changed = frame.copy();
+        # Create a mask image for drawing purposes
+        mask = np.zeros_like(background_model)
+        if nonzeros is not None and len(nonzeros) > 0:
+            nonzeros = np.float32(nonzeros)
+            p1, st, err = cv2.calcOpticalFlowPyrLK(background_model, frame_changed, nonzeros, None, **lk_params)
+
+            # Select good points
+            good_new = p1[st == 1]
+            good_old = nonzeros[st == 1]
+
+            # draw the tracks
+            for i, (new, old) in enumerate(zip(good_new, good_old)):
+                # print(i, (new, old))
+                a, b = new.ravel()
+                c, d = old.ravel()
+                cv2.line(mask, (a, b), (c, d), color[i % 100].tolist(), 2)
+                cv2.circle(frame_changed, (a, b), 5, color[i % 100].tolist(), -1)
+
+            frame_changed = cv2.add(frame_changed, mask)
+
+        # display frames
+        cv2.imshow("Current frame", frame_changed)
+        # cv2.imshow("Background model", background_model)
+        cv2.imshow("Diff", dilation)
+
+        # current frame becomes background model
+        background_model = frame
+
+        # break loop on user input
+        k = cv2.waitKey(1) & 0xff
+        if k == ord("q"):
+            break
+        elif k == ord('p'):
+            cv2.imwrite("test_frame_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + ".png", frame)
+            cv2.imwrite("test_thresh_" + str(time.strftime("%d-%m-%Y-%H-%M-%S")) + ".png", dilation)
 
     cap.release()
     cv2.destroyAllWindows()
@@ -258,19 +340,32 @@ def process_optical_LK(video_path):
 
     # Take first frame and find corners in it
     ret, old_frame = cap.read()
+    if not ret:
+        return
+    old_frame = imutils.resize(old_frame, width=800)
     old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+    # old_gray, old_orig = grab_and_convert_frame(cap)
+    # if old_gray is None:
+    #     return
     p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
 
     # Create a mask image for drawing purposes
     mask = np.zeros_like(old_frame)
 
-    while (1):
+    while True:
+        # frame_gray, orig = grab_and_convert_frame(cap)
         ret, frame = cap.read()
-        # if the frame could not be grabbed, then we have reached the end of the video
         if not ret:
             print('No frame could be grabbed. Exiting video processing...')
             break
+
+        frame = imutils.resize(frame, width=800)
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # if the frame could not be grabbed, then we have reached the end of the video
+        # if frame_gray is None:
+        #     print('No frame could be grabbed. Exiting video processing...')
+        #     break
 
         # calculate optical flow
         p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
@@ -281,14 +376,17 @@ def process_optical_LK(video_path):
 
         # draw the tracks
         for i, (new, old) in enumerate(zip(good_new, good_old)):
+            # print(i, (new, old))
             a, b = new.ravel()
             c, d = old.ravel()
-            mask = cv2.line(mask, (a, b), (c, d), color[i].tolist(), 2)
-            frame = cv2.circle(frame, (a, b), 5, color[i].tolist(), -1)
-        cv2.imshow('mask', mask)
-        # img = cv2.add(frame,mask)
+            cv2.line(mask, (a, b), (c, d), color[i % 100].tolist(), 2)
+            cv2.circle(frame_gray, (a, b), 5, color[i % 100].tolist(), -1)
 
-        # cv2.imshow('frame',img)
+        #
+        # cv2.imshow('mask', mask)
+        img = cv2.add(frame, mask)
+        cv2.imshow('frame', img)
+
         k = cv2.waitKey(30) & 0xff
         if k == ord('q'):
             break
@@ -312,4 +410,4 @@ def create_and_parse_args():
 
 if __name__ == '__main__':
     args = create_and_parse_args()
-    process(args.get('video', None), args.get('out_dir', ""))
+    process(args.get('video', None), args.get('out_dir', None))
