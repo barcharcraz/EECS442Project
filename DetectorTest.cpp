@@ -9,26 +9,32 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
 #include "DetectionTracker.h"
-
-int main(int argc, char** argv) {
+void run(const std::string& video) {
 	using namespace cv;
 	using std::chrono::high_resolution_clock;
 	using std::chrono::time_point;
 	using std::chrono::duration;
 	using std::chrono::milliseconds;
+	using std::string;
 	using std::chrono::duration_cast;
 	using std::to_string;
 	//using namespace std::literals;
 	using std::vector;
 	const int frameskip = 1;
-	VideoCapture cap("VIRAT_S_000001.mp4");
+	const int framedump = 30;
+	VideoCapture cap(video);
 	if (!cap.isOpened()) {
 		fprintf(stderr, "Could not open video\n");
 		std::exit(EXIT_FAILURE);
 	}
-	VideoWriter output;
+	//cap.set(CV_CAP_PROP_POS_MSEC, 120000);
+	VideoWriter output_tracking;
 	Size videoSize{ (int)cap.get(CV_CAP_PROP_FRAME_WIDTH), (int)cap.get(CV_CAP_PROP_FRAME_HEIGHT) };
-	output.open("output.mkv", VideoWriter::fourcc('D', 'I', 'V', 'X'), cap.get(CV_CAP_PROP_FPS), videoSize, true);
+	auto it = find(begin(video), end(video), '.');
+	string outputVideo(begin(video), it);
+	output_tracking.open(outputVideo + "_out_tracking.mkv", VideoWriter::fourcc('D', 'I', 'V', 'X'), cap.get(CV_CAP_PROP_FPS), videoSize, true);
+	VideoWriter output;
+	output.open(outputVideo + "_out.mkv", VideoWriter::fourcc('D', 'I', 'V', 'X'), cap.get(CV_CAP_PROP_FPS), videoSize, true);
 	auto hog = cuda::HOG::create();
 	//auto hog = cv::Ptr<cv::HOGDescriptor>(new cv::HOGDescriptor());
 	Mat detector = hog->getDefaultPeopleDetector();
@@ -47,7 +53,7 @@ int main(int argc, char** argv) {
 	time_point<high_resolution_clock> start, end;
 	duration<double> elapsed;
 	DetectionTracker tracker(1280, 720, frameskip);
-	int lastTracks;
+	int lastTracks = 0;
 	vector<Rect> found;
 	while (cap.read(img)) {
 		start = high_resolution_clock::now();
@@ -66,7 +72,10 @@ int main(int argc, char** argv) {
 			//hog.detectMultiScale(img, found, 0, Size(8, 8), Size(32, 32), 1.02, 2);
 			//hog.detect(img, found, 0, Size(8, 8), Size(32, 32));
 			hog->detectMultiScale(gpu_img, found);
-			assert(found.size() < 150);
+			/*
+			if (found.size() > 150) {
+			found = vector<Rect>{};
+			}*/
 			auto ms = cap.get(CAP_PROP_POS_MSEC);
 			auto s = ms / 1000;
 			auto m = s / 60;
@@ -78,7 +87,7 @@ int main(int argc, char** argv) {
 			end = high_resolution_clock::now();
 			elapsed = end - start;
 			fprintf(stderr, "Time: %d:%d:%d", (int)m, (int)s, (int)ms);
-			fprintf(stderr, " MS/frame: %d ms\n", duration_cast<milliseconds>(elapsed).count());
+			fprintf(stderr, " MS/frame: %ld ms\n", duration_cast<milliseconds>(elapsed).count());
 		}
 		for (int i = 0; i < tracker.size(); ++i) {
 			auto& r = tracker.getDetection(i);
@@ -87,15 +96,42 @@ int main(int argc, char** argv) {
 
 		}
 
-		if (found.size() || lastTracks != tracker.size()) {
+		if (lastTracks != tracker.size()) {
+			output_tracking << orig;
+		}
+		if (found.size()) {
 			output << orig;
 		}
-		lastTracks = tracker.size();
+		if (!(frame % framedump)) lastTracks = tracker.size();
 		imshow("EECS442 Project", orig);
 		if (waitKey(20) >= 0) {
 			break;
 		}
 	}
-
+}
+int main(int argc, char** argv) {
+	using namespace cv;
+	using std::chrono::high_resolution_clock;
+	using std::chrono::time_point;
+	using std::chrono::duration;
+	using std::chrono::milliseconds;
+	using std::string;
+	using std::chrono::duration_cast;
+	using std::to_string;
+	//using namespace std::literals;
+	using std::vector;
+	const vector<string> inputs{
+		"VIRAT_S_000001.mp4",
+		"VIRAT_S_000002.mp4",
+		"VIRAT_S_000003.mp4",
+		"VIRAT_S_000004.mp4",
+		"VIRAT_S_000006.mp4",
+		"VIRAT_S_050300_01_000148_000396.mp4",
+		"VIRAT_S_000201_00_000018_000380.mp4"
+	};
+	//cap.set(CV_CAP_PROP_POS_MSEC, 120000);
+	for (auto& video : inputs) {
+		run(video);
+	}
 	return EXIT_SUCCESS;
 }

@@ -39,10 +39,8 @@ void DetectionTracker::addDetection(const Rect& detection) {
 
 }
 void DetectionTracker::addDetections(const vector<Rect>& detections) {
-    updated_tracks.clear();
-    for(auto& elm : track_times) {
-        elm += 1;
-    }
+	for (auto& b : updated_tracks) b = false;
+    for(auto& elm : track_times) elm += 1;
     for(auto& elm : detections) {
         addDetection(elm);
     }
@@ -61,7 +59,7 @@ void DetectionTracker::addDetections(const vector<Rect>& detections) {
     }
 }
 int DetectionTracker::queryDetectionTrack(const Rect& detection) const {
-    const double eps = 1.5 * eps_mult;
+    const double eps = 10 * eps_mult;
     double mindist = numeric_limits<double>::infinity();
     int minidx = -1;
     for(int i = 0; i < tracks.size(); ++i) {
